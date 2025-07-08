@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLB Power Rankings Auto-Updater</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #1e3c72;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .update-controls {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .auto-update-settings {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .auto-update-settings label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .auto-update-settings input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .auto-update-settings select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+
+        .rankings-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .last-updated {
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: linear-gradient(45deg, #1e3c72, #2a5298);
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            border: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:hover {
+            background-color: #e3f2fd;
+            transition: background-color 0.3s ease;
+        }
+
+        .rank-cell {
+            font-weight: bold;
+            color: #1e3c72;
+            text-align: center;
+            width: 60px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        }
+
+        .top-5 {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7) !important;
+        }
+
+        .bottom-5 {
+            background: linear-gradient(135deg, #f8d7da, #fdcae1) !important;
+        }
+
+        .playoff-team {
+            border-left: 4px solid #28a745;
+        }
+
+        .bubble-team {
+            border-left: 4px solid #ffc107;
+        }
+
+        .lottery-team {
+            border-left: 4px solid #dc3545;
+        }
+
+        .team-name {
+            font-weight: 600;
+            color: #1e3c72;
+        }
+
+        .record {
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+        }
+
+        .trends-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .trends-section h2 {
+            color: #1e3c72;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .trend-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .trend-title {
+            font-weight: 600;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .control-group {
+                flex-direction: column;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 8px 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 MLB Power Rankings Auto-Updater</h1>
+            <p>Real-time MLB power rankings with automatic updates and home/away records</p>
+        </div>
+
+        <div class="update-controls">
+            <div class="control-group">
+                <button class="btn" onclick="updateRankings()">📊 Update Rankings Now</button>
+                <button class="btn btn-secondary" onclick="exportData()">💾 Export Data</button>
+                <button class="btn btn-secondary" onclick="showUpdateHistory()">📈 Update History</button>
+            </div>
+            
+            <div class="auto-update-settings">
+                <label>
+                    <input type="checkbox" id="autoUpdate" onchange="toggleAutoUpdate()">
+                    Enable Auto-Update
+                </label>
+                <label>
+                    Update Frequency:
+                    <select id="updateFrequency">
+                        <option value="3600000">Every Hour</option>
+                        <option value="21600000">Every 6 Hours</option>
+                        <option value="86400000" selected>Daily</option>
+                        <option value="604800000">Weekly</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="statusText">Ready for updates</span>
+                <span id="lastUpdate" class="last-updated"></span>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>Fetching latest power rankings...</p>
+        </div>
+
+        <div class="rankings-container">
+            <div class="last-updated" id="dataTimestamp">Last updated: Never</div>
+            
+            <div class="table-container">
+                <table id="rankingsTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Team</th>
+                            <th>Overall Record</th>
+                            <th>Home Record</th>
+                            <th>Away Record</th>
+                            <th>Win %</th>
+                            <th>Key Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankingsBody">
+                        <!-- Rankings will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="trends-section">
+            <h2>📈 Key Trends & Analysis</h2>
+            <div id="trendsContainer">
+                <!-- Trends will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let autoUpdateInterval = null;
+        let updateHistory = [];
+        let currentRankings = [];
+
+        // Complete MLB rankings data (would be replaced with real API calls)
+        const sampleRankings = [
+            {rank: 1, team: "Los Angeles Dodgers", overall: "55-32", home: "30-14", away: "25-18", winPct: 0.632, notes: "Despite rotation injuries and Betts/Freeman struggles, still atop NL standings"},
+            {rank: 2, team: "Detroit Tigers", overall: "54-33", home: "29-14", away: "25-19", winPct: 0.621, notes: "Tarik Skubal dominance continues; best overall record alongside Dodgers"},
+            {rank: 3, team: "Philadelphia Phillies", overall: "51-36", home: "28-15", away: "23-21", winPct: 0.586, notes: "Zack Wheeler having Cy Young-caliber season with 0.58 ERA in June"},
+            {rank: 4, team: "Houston Astros", overall: "52-34", home: "27-16", away: "25-18", winPct: 0.605, notes: "19-7 in June; 7-game lead in AL West despite Yordan Alvarez injury"},
+            {rank: 5, team: "Chicago Cubs", overall: "51-35", home: "26-17", away: "25-18", winPct: 0.593, notes: "Matthew Boyd leading rotation; strong offensive production"},
+            {rank: 6, team: "New York Yankees", overall: "48-38", home: "25-17", away: "23-21", winPct: 0.558, notes: "Tied atop AL East but offense struggled in June (.718 OPS)"},
+            {rank: 7, team: "Tampa Bay Rays", overall: "48-39", home: "26-17", away: "22-22", winPct: 0.552, notes: "Junior Caminero on pace for 40+ HR season; surging to AL East contention"},
+            {rank: 8, team: "Milwaukee Brewers", overall: "48-38", home: "26-16", away: "22-22", winPct: 0.558, notes: "Brandon Woodruff returning to rotation; Jacob Misiorowski impressive debut"},
+            {rank: 9, team: "New York Mets", overall: "49-38", home: "27-16", away: "22-22", winPct: 0.563, notes: "Lost 14 of 18 after hot start; slumping from NL lead to wild card race"},
+            {rank: 10, team: "Toronto Blue Jays", overall: "48-38", home: "25-17", away: "23-21", winPct: 0.558, notes: "Tied atop AL East; Alejandro Kirk playing at All-Star level"},
+            {rank: 11, team: "St. Louis Cardinals", overall: "47-41", home: "26-18", away: "21-23", winPct: 0.534, notes: "Sonny Gray threw career-best shutout; in wild card contention"},
+            {rank: 12, team: "San Diego Padres", overall: "46-40", home: "25-18", away: "21-22", winPct: 0.535, notes: "Offense struggled in June; bottom of lineup needs improvement"},
+            {rank: 13, team: "San Francisco Giants", overall: "46-41", home: "24-19", away: "22-22", winPct: 0.529, notes: "Lost 12 of 17 after strong start; Rafael Devers trade impact"},
+            {rank: 14, team: "Seattle Mariners", overall: "45-41", home: "24-18", away: "21-23", winPct: 0.523, notes: "Cal Raleigh on historic home run pace for a catcher"},
+            {rank: 15, team: "Cincinnati Reds", overall: "45-42", home: "24-19", away: "21-23", winPct: 0.517, notes: "Spencer Steer heating up with three-homer game; Matt McLain improving"},
+            {rank: 16, team: "Arizona Diamondbacks", overall: "43-43", home: "22-21", away: "21-22", winPct: 0.500, notes: "Roller coaster June; GM not ready to give up on 2025 season"},
+            {rank: 17, team: "Texas Rangers", overall: "43-44", home: "23-20", away: "20-24", winPct: 0.494, notes: "Marcus Semien showing signs of improvement; offense still lagging"},
+            {rank: 18, team: "Boston Red Sox", overall: "41-44", home: "22-21", away: "19-23", winPct: 0.482, notes: "Walker Buehler struggling (6.45 ERA); Rafael Devers traded to Giants"},
+            {rank: 19, team: "Atlanta Braves", overall: "39-46", home: "21-22", away: "18-24", winPct: 0.459, notes: "Ronald Acuña Jr. return hasn't sparked offense as expected"},
+            {rank: 20, team: "Cleveland Guardians", overall: "40-44", home: "22-20", away: "18-24", winPct: 0.476, notes: "Brayan Rocchio recalled; José Ramírez carrying the team"},
+            {rank: 21, team: "Los Angeles Angels", overall: "42-43", home: "22-20", away: "20-23", winPct: 0.494, notes: "Jo Adell finally breaking out (.295/.381/.628 since May 21)"},
+            {rank: 22, team: "Minnesota Twins", overall: "41-45", home: "22-21", away: "19-24", winPct: 0.477, notes: "Royce Lewis back from injury; infield options developing"},
+            {rank: 23, team: "Kansas City Royals", overall: "40-47", home: "20-24", away: "20-23", winPct: 0.460, notes: "Struggling at home (2.84 scoring average worst in majors)"},
+            {rank: 24, team: "Baltimore Orioles", overall: "37-49", home: "20-22", away: "17-27", winPct: 0.430, notes: "Offense declined significantly; road struggles particularly pronounced"},
+            {rank: 25, team: "Miami Marlins", overall: "38-46", home: "20-21", away: "18-25", winPct: 0.452, notes: "Eight-game winning streak moved them up in NL East standings"},
+            {rank: 26, team: "Pittsburgh Pirates", overall: "38-50", home: "20-23", away: "18-27", winPct: 0.432, notes: "Mitch Keller's bad luck finally turning around with recent wins"},
+            {rank: 27, team: "Washington Nationals", overall: "36-50", home: "19-24", away: "17-26", winPct: 0.419, notes: "James Wood emerging as future star with 31 career homers"},
+            {rank: 28, team: "Oakland Athletics", overall: "36-53", home: "19-26", away: "17-27", winPct: 0.404, notes: "Shea Langeliers' return bringing new energy to struggling team"},
+            {rank: 29, team: "Chicago White Sox", overall: "28-58", home: "15-28", away: "13-30", winPct: 0.326, notes: "Adrian Houser providing bright spot (1.90 ERA in 7 starts)"},
+            {rank: 30, team: "Colorado Rockies", overall: "19-67", home: "10-33", away: "9-34", winPct: 0.221, notes: "On pace for 126 losses; only 10 wins in June, 9 in first three months"}
+        ];
+
+        const sampleTrends = [
+            {
+                title: "🔥 Hottest Teams",
+                content: "Houston Astros (19-7 in June with +32 run differential), Tampa Bay Rays (15-22 in June), Miami Marlins (8-game win streak, 17-13 in last 30 games)"
+            },
+            {
+                title: "⚔️ Divisional Battles",
+                content: "AL East: Yankees/Blue Jays tied atop division, Rays 0.5 GB • NL West: Dodgers/Tigers tied for best record • AL West: Astros 7-game lead over Mariners"
+            },
+            {
+                title: "📈 Biggest Risers",
+                content: "Houston Astros (from #17 to #4 since mid-May), Tampa Bay Rays (highest ranking of season), Miami Marlins (surging in NL East)"
+            },
+            {
+                title: "📉 Notable Fallers",
+                content: "New York Mets (from NL leaders to wild card race after 14-18 stretch), Seattle Mariners (from #8 to #14), San Francisco Giants (12-17 slide)"
+            },
+            {
+                title: "🎯 Individual Standouts",
+                content: "Tarik Skubal (Tigers) - Cy Young frontrunner • Cal Raleigh (Mariners) - historic HR pace for catchers • Junior Caminero (Rays) - 40+ HR pace at age 21"
+            },
+            {
+                title: "🏠 Home/Road Splits",
+                content: "Best home teams: Dodgers (30-14), Tigers (29-14) • Worst road teams: Rockies (9-34), White Sox (13-30), Orioles (17-27)"
+            },
+            {
+                title: "🚨 Teams to Watch",
+                content: "Deadline sellers: Rockies (German Marquez), D-backs (pending FAs) • Buyers: Astros, Cubs, Phillies looking for rotation help"
+            },
+            {
+                title: "📊 Statistical Leaders",
+                content: "Best ERA: Phillies rotation • Most HRs: Yankees offense • Best defense: Rays (fewest errors) • Most steals: Rays offense"
+            }
+        ];
+
+        // Initialize the application
+        function init() {
+            loadSampleData();
+            updateTimestamp();
+            loadUpdateHistory();
+        }
+
+        // Load sample data (replace with real API calls)
+        function loadSampleData() {
+            currentRankings = sampleRankings;
+            updateRankingsTable();
+            updateTrends();
+        }
+
+        // Update rankings (simulates API call)
+        async function updateRankings() {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
+            statusText.textContent = 'Fetching latest rankings...';
+            
+            try {
+                // Simulate API call delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // In a real implementation, you would:
+                // 1. Fetch data from ESPN, MLB.com, or other sources
+                // 2. Parse the HTML/JSON response
+                // 3. Extract rankings and records
+                // 4. Calculate trends and changes
+                
+                // For demo, we'll simulate small changes
+                currentRankings = simulateRankingChanges();
+                
+                updateRankingsTable();
+                updateTrends();
+                updateTimestamp();
+                addToUpdateHistory();
+                
+                statusText.textContent = 'Rankings updated successfully';
+                
+            } catch (error) {
+                console.error('Error updating rankings:', error);
+                statusText.textContent = 'Error updating rankings';
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        // Simulate ranking changes (replace with real data processing)
+        function simulateRankingChanges() {
+            return currentRankings.map(team => ({
+                ...team,
+                // Simulate minor record changes
+                winPct: Math.max(0.1, Math.min(0.9, team.winPct + (Math.random() - 0.5) * 0.02))
+            })).sort((a, b) => b.winPct - a.winPct).map((team, index) => ({
+                ...team,
+                rank: index + 1
+            }));
+        }
+
+        // Update the rankings table
+        function updateRankingsTable() {
+            const tbody = document.getElementById('rankingsBody');
+            tbody.innerHTML = '';
+            
+            currentRankings.forEach(team => {
+                const row = document.createElement('tr');
+                
+                // Add visual indicators based on ranking
+                let rowClass = '';
+                let teamClass = '';
+                if (team.rank <= 5) {
+                    rowClass = 'top-5';
+                    teamClass = 'playoff-team';
+                } else if (team.rank <= 12) {
+                    teamClass = 'playoff-team';
+                } else if (team.rank <= 20) {
+                    teamClass = 'bubble-team';
+                } else if (team.rank >= 26) {
+                    rowClass = 'bottom-5';
+                    teamClass = 'lottery-team';
+                } else {
+                    teamClass = 'lottery-team';
+                }
+                
+                row.className = `${rowClass} ${teamClass}`;
+                row.innerHTML = `
+                    <td class="rank-cell">${team.rank}</td>
+                    <td class="team-name">${team.team}</td>
+                    <td class="record">${team.overall}</td>
+                    <td class="record">${team.home}</td>
+                    <td class="record">${team.away}</td>
+                    <td class="record">${team.winPct.toFixed(3)}</td>
+                    <td>${team.notes}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update trends section
+        function updateTrends() {
+            const container = document.getElementById('trendsContainer');
+            container.innerHTML = '';
+            
+            sampleTrends.forEach(trend => {
+                const trendDiv = document.createElement('div');
+                trendDiv.className = 'trend-item';
+                trendDiv.innerHTML = `
+                    <div class="trend-title">${trend.title}</div>
+                    <div>${trend.content}</div>
+                `;
+                container.appendChild(trendDiv);
+            });
+        }
+
+        // Update timestamp
+        function updateTimestamp() {
+            const now = new Date();
+            const timestamp = now.toLocaleString();
+            document.getElementById('dataTimestamp').textContent = `Last updated: ${timestamp}`;
+            document.getElementById('lastUpdate').textContent = `Last update: ${timestamp}`;
+        }
+
+        // Toggle auto-update functionality
+        function toggleAutoUpdate() {
+            const checkbox = document.getElementById('autoUpdate');
+            const frequency = document.getElementById('updateFrequency').value;
+            const statusText = document.getElementById('statusText');
+            
+            if (checkbox.checked) {
+                autoUpdateInterval = setInterval(updateRankings, parseInt(frequency));
+                statusText.textContent = 'Auto-update enabled';
+            } else {
+                clearInterval(autoUpdateInterval);
+                autoUpdateInterval = null;
+                statusText.textContent = 'Auto-update disabled';
+            }
+        }
+
+        // Add to update history
+        function addToUpdateHistory() {
+            const now = new Date();
+            updateHistory.push({
+                timestamp: now,
+                topTeam: currentRankings[0]?.team || 'Unknown',
+                changes: Math.floor(Math.random() * 5) + 1 // Simulate changes
+            });
+            
+            // Keep only last 50 updates
+            if (updateHistory.length > 50) {
+                updateHistory = updateHistory.slice(-50);
+            }
+            
+            // Save to localStorage (in a real app, you'd use a database)
+            try {
+                localStorage.setItem('mlb_update_history', JSON.stringify(updateHistory));
+            } catch (e) {
+                console.log('Could not save to localStorage');
+            }
+        }
+
+        // Load update history
+        function loadUpdateHistory() {
+            try {
+                const saved = localStorage.getItem('mlb_update_history');
+                if (saved) {
+                    updateHistory = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.log('Could not load from localStorage');
+            }
+        }
+
+        // Show update history
+        function showUpdateHistory() {
+            if (updateHistory.length === 0) {
+                alert('No update history available');
+                return;
+            }
+            
+            const historyText = updateHistory.slice(-10).map(update => 
+                `${update.timestamp.toLocaleString ? new Date(update.timestamp).toLocaleString() : update.timestamp}: ${update.topTeam} at #1 (${update.changes} changes)`
+            ).join('\n');
+            
+            alert(`Recent Updates:\n\n${historyText}`);
+        }
+
+        // Export data functionality
+        function exportData() {
+            const data = {
+                rankings: currentRankings,
+                trends: sampleTrends,
+                lastUpdated: new Date().toISOString(),
+                updateHistory: updateHistory
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `mlb_power_rankings_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // Handle frequency changes
+        document.getElementById('updateFrequency').addEventListener('change', function() {
+            const checkbox = document.getElementById('autoUpdate');
+            if (checkbox.checked) {
+                toggleAutoUpdate(); // Turn off
+                checkbox.checked = true;
+                toggleAutoUpdate(); // Turn back on with new frequency
+            }
+        });
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Clean up interval on page unload
+        window.addEventListener('beforeunload', function() {
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
